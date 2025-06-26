@@ -279,37 +279,26 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    // REAL SOLUTION: Encode ALL board data in the URL itself
-    // This way students can access the exact board from any device
+    // SIMPLE SOLUTION: Put essential data directly in URL parameters
+    // This avoids encoding issues and works reliably with Hebrew
     
-    // Create compact data object (shorter keys to reduce URL length)
-    const compactData = {
-        c: boardData.code,
-        t: boardData.teacherName,
-        q: boardData.question,
-        i: boardData.image || null,
-        a: boardData.settings.allowAnonymous,
-        m: boardData.settings.moderateResponses
-    };
+    const params = new URLSearchParams();
+    params.set('code', boardData.code);
+    params.set('teacher', boardData.teacherName);
+    params.set('question', boardData.question);
     
-    // Convert to JSON and encode for URL
-    const dataString = JSON.stringify(compactData);
-    
-    // Use base64 encoding that works with Hebrew
-    let encodedData;
-    try {
-        // First encode Hebrew characters properly, then base64
-        encodedData = btoa(encodeURIComponent(dataString));
-    } catch (e) {
-        console.error('Encoding error:', e);
-        // Fallback: just use encodeURIComponent
-        encodedData = encodeURIComponent(dataString);
+    if (boardData.image) {
+        // For images, we'll still store in localStorage and reference by code
+        params.set('hasImage', 'true');
     }
     
-    // Create URL with encoded data
-    let boardLink = `${protocol}//${host}${basePath}board.html?data=${encodedData}`;
+    params.set('allowAnonymous', boardData.settings.allowAnonymous);
+    params.set('moderateResponses', boardData.settings.moderateResponses);
     
-    console.log('Generated board link with encoded data:', boardLink);
+    // Create URL with simple parameters
+    let boardLink = `${protocol}//${host}${basePath}board.html?${params.toString()}`;
+    
+    console.log('Generated board link with parameters:', boardLink);
     console.log('Link length:', boardLink.length);
     
     document.getElementById('boardLink').textContent = boardLink;
@@ -472,59 +461,55 @@ function initializeBoard() {
     
     let boardData = null;
     
-    // PRIORITY 1: Try to get data from URL (the real solution)
-    const encodedData = urlParams.get('data');
-    if (encodedData) {
-        console.log('Found encoded data in URL, decoding...');
-        try {
-            let dataString;
-            
-            // Try to decode base64 first
-            try {
-                dataString = decodeURIComponent(atob(encodedData));
-                console.log('Successfully decoded base64 data');
-            } catch (e) {
-                // Fallback: treat as direct encoded data
-                dataString = decodeURIComponent(encodedData);
-                console.log('Using direct decoded data');
-            }
-            
-            const compactData = JSON.parse(dataString);
-            console.log('Parsed compact data:', compactData);
-            
-            // Reconstruct full board data from compact format
-            boardData = {
-                code: compactData.c,
-                teacherName: compactData.t,
-                question: compactData.q,
-                image: compactData.i,
-                settings: {
-                    allowAnonymous: compactData.a,
-                    moderateResponses: compactData.m
-                },
-                createdAt: new Date().toISOString(),
-                responses: []
-            };
-            
-            console.log('Board data reconstructed from URL:', boardData);
-            
-            // Save to localStorage for response persistence
-            localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
-            
-        } catch (e) {
-            console.error('Error decoding board data from URL:', e);
-            alert('שגיאה בפרסור נתוני הלוח מהקישור. נסה קישור חדש מהמורה.');
-            return;
-        }
-    }
+    // Get data from URL parameters - simple and reliable
+    const boardCode = urlParams.get('code');
+    const teacherName = urlParams.get('teacher');
+    const question = urlParams.get('question');
     
-    // FALLBACK: Try old code-based method for backward compatibility
-    if (!boardData) {
-        const boardCode = urlParams.get('code');
-        if (boardCode) {
-            console.log('Trying legacy code-based loading for:', boardCode);
+    if (boardCode && teacherName && question) {
+        console.log('Found board data in URL parameters');
+        
+        // Reconstruct board data from URL parameters
+        boardData = {
+            code: boardCode,
+            teacherName: decodeURIComponent(teacherName),
+            question: decodeURIComponent(question),
+            image: null, // Will load from localStorage if exists
+            settings: {
+                allowAnonymous: urlParams.get('allowAnonymous') === 'true',
+                moderateResponses: urlParams.get('moderateResponses') === 'true'
+            },
+            createdAt: new Date().toISOString(),
+            responses: []
+        };
+        
+        // Check if there's an image in localStorage
+        if (urlParams.get('hasImage') === 'true') {
+            const existingBoardData = localStorage.getItem(`board_${boardCode}`);
+            if (existingBoardData) {
+                try {
+                    const existing = JSON.parse(existingBoardData);
+                    if (existing.image) {
+                        boardData.image = existing.image;
+                    }
+                } catch (e) {
+                    console.log('Could not load existing image:', e);
+                }
+            }
+        }
+        
+        console.log('Board data reconstructed from URL parameters:', boardData);
+        
+        // Save to localStorage for response persistence and future loading
+        localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
+        
+    } else {
+        // FALLBACK: Try localStorage for backward compatibility
+        const legacyCode = urlParams.get('code');
+        if (legacyCode) {
+            console.log('Trying legacy localStorage loading for:', legacyCode);
             
-            const boardDataString = localStorage.getItem(`board_${boardCode}`);
+            const boardDataString = localStorage.getItem(`board_${legacyCode}`);
             if (boardDataString) {
                 try {
                     boardData = JSON.parse(boardDataString);
@@ -538,7 +523,7 @@ function initializeBoard() {
     
     // If still no board data, show clear error
     if (!boardData) {
-        alert('לא ניתן לטעון את נתוני הלוח.\n\nבקש מהמורה לשלוח קישור חדש ללוח.');
+        alert('לא ניתן לטעון את הלוח. הקישור אינו תקין או שפג תוקפו.\n\nבקש מהמורה לשלוח קישור חדש.');
         return;
     }
     
