@@ -303,6 +303,15 @@ function showBoardCreated(boardData) {
     
     document.getElementById('boardLink').textContent = boardLink;
     
+    // Add important note for teacher about sharing
+    const linkInstruction = document.querySelector('.link-instruction');
+    if (linkInstruction) {
+        linkInstruction.innerHTML = `
+            <strong>חשוב:</strong> לחץ על כפתור ההעתקה והדבק את הקישור בוואטסאפ של הכיתה<br/>
+            <small style="color: #666;">💡 כדי לראות תגובות חדשות מהתלמידים, תצטרך לרענן את הדף או לחזור ללוח מהקישור</small>
+        `;
+    }
+    
     // Also store in localStorage as backup for response persistence
     localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
     
@@ -604,25 +613,46 @@ function showStudentNameForm() {
 }
 
 function loadResponses() {
+    console.log('Loading responses for board:', currentBoard.code);
+    
+    // Load responses from localStorage
     const boardDataString = localStorage.getItem(`board_${currentBoard.code}`);
     if (boardDataString) {
-        const boardData = JSON.parse(boardDataString);
-        currentBoard = boardData; // Update current board with latest data
-        responses = boardData.responses || [];
-        
-        displayResponses();
-        updateWordCloud();
-        updateStats();
-        
-        // Show/hide empty state
-        const emptyState = document.getElementById('emptyState');
-        if (responses.length === 0) {
-            emptyState.style.display = 'block';
-            document.getElementById('gridView').style.display = 'none';
-        } else {
-            emptyState.style.display = 'none';
-            document.getElementById('gridView').style.display = 'block';
+        try {
+            const boardData = JSON.parse(boardDataString);
+            responses = boardData.responses || [];
+            currentBoard.responses = responses;
+            console.log('Loaded responses:', responses.length);
+        } catch (e) {
+            console.error('Error parsing board data:', e);
+            responses = [];
         }
+    } else {
+        responses = [];
+    }
+    
+    displayResponses();
+    updateWordCloud();
+    updateStats();
+    
+    // Show/hide empty state
+    const emptyState = document.getElementById('emptyState');
+    if (responses.length === 0) {
+        emptyState.style.display = 'block';
+        document.getElementById('gridView').style.display = 'none';
+        
+        // Show helpful message for students
+        if (!isTeacher) {
+            const helpText = document.createElement('p');
+            helpText.style.color = '#6c757d';
+            helpText.style.textAlign = 'center';
+            helpText.style.marginTop = '20px';
+            helpText.innerHTML = 'עדיין אין תגובות בלוח.<br/>בואו נתחיל לשתף רעיונות!';
+            emptyState.appendChild(helpText);
+        }
+    } else {
+        emptyState.style.display = 'none';
+        document.getElementById('gridView').style.display = 'block';
     }
 }
 
@@ -689,7 +719,7 @@ function addResponse(event) {
     // Add to responses
     responses.push(response);
     
-    // Save to localStorage
+    // Save locally
     currentBoard.responses = responses;
     localStorage.setItem(`board_${currentBoard.code}`, JSON.stringify(currentBoard));
     
@@ -701,7 +731,15 @@ function addResponse(event) {
     // Hide form
     hideResponseForm();
     
-    showToast('התגובה נוספה בהצלחה!');
+    // Show success message with sharing instruction
+    showToast('התגובה נוספה! המורה יוכל לראות אותה בלוח שלו.');
+    
+    // Show instruction to share updated link
+    if (!isTeacher) {
+        setTimeout(() => {
+            alert('התגובה שלך נוספה!\n\nכדי שהמורה וכל התלמידים יראו את התגובה החדשה, בקש מהמורה לשתף שוב את הקישור ללוח.');
+        }, 2000);
+    }
 }
 
 function toggleTeacherControls() {
