@@ -254,7 +254,7 @@ function showBoardCreated(boardData) {
     document.getElementById('teacherForm').style.display = 'none';
     document.getElementById('boardCreated').style.display = 'block';
     
-    // Create correct board link with encoded board data
+    // Create simple board link - we'll handle data sharing differently
     const protocol = window.location.protocol; // http: or https:
     const host = window.location.host; // domain:port
     const pathname = window.location.pathname; // current path
@@ -266,9 +266,7 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    // Encode board data in the URL
-    const encodedBoardData = encodeURIComponent(JSON.stringify(boardData));
-    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}&data=${encodedBoardData}`;
+    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}`;
     
     console.log('Generated board link:', boardLink);
     console.log('Protocol:', protocol);
@@ -277,8 +275,16 @@ function showBoardCreated(boardData) {
     
     document.getElementById('boardLink').textContent = boardLink;
     
-    // Also store the board data locally AND in localStorage for backup
+    // Store board data in localStorage AND try to save to a shared location
     localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
+    
+    // Also try to save to sessionStorage which might be more accessible
+    try {
+        sessionStorage.setItem(`shared_board_${boardData.code}`, JSON.stringify(boardData));
+    } catch (e) {
+        console.log('Could not save to sessionStorage:', e);
+    }
+    
     window.currentBoardData = boardData;
 }
 
@@ -427,10 +433,8 @@ function testWordCloud() {
 function initializeBoard() {
     const urlParams = new URLSearchParams(window.location.search);
     const boardCode = urlParams.get('code');
-    const encodedBoardData = urlParams.get('data');
     
     console.log('Initializing board with code:', boardCode);
-    console.log('Board data from URL:', encodedBoardData ? 'Found' : 'Not found');
     
     if (!boardCode) {
         alert('קישור לא תקין');
@@ -440,46 +444,56 @@ function initializeBoard() {
     
     let boardData = null;
     
-    // First try to get board data from URL
-    if (encodedBoardData) {
+    // Try to load board data from localStorage
+    console.log('Searching for board in localStorage...');
+    const boardDataString = localStorage.getItem(`board_${boardCode}`);
+    console.log('Board data string found:', boardDataString);
+    
+    if (boardDataString) {
         try {
-            boardData = JSON.parse(decodeURIComponent(encodedBoardData));
-            console.log('Board data loaded from URL:', boardData);
+            boardData = JSON.parse(boardDataString);
+            console.log('Board data loaded from localStorage:', boardData);
         } catch (e) {
-            console.error('Error parsing board data from URL:', e);
+            console.error('Error parsing board data from localStorage:', e);
         }
     }
     
-    // If no data in URL, try localStorage as fallback
+    // If no board data found, create a minimal board and ask teacher to recreate
     if (!boardData) {
-        console.log('Searching for board in localStorage...');
-        const boardDataString = localStorage.getItem(`board_${boardCode}`);
-        console.log('Board data string found:', boardDataString);
+        console.log('Board not found, creating minimal board structure');
         
-        if (boardDataString) {
-            try {
-                boardData = JSON.parse(boardDataString);
-                console.log('Board data loaded from localStorage:', boardData);
-            } catch (e) {
-                console.error('Error parsing board data from localStorage:', e);
-            }
+        // Show a message to the teacher to recreate the board
+        const recreateBoard = confirm(`לוח עם קוד ${boardCode} לא נמצא.\n\nזה יכול לקרות כי הלוח נוצר במכשיר אחר.\n\nהאם תרצה ליצור לוח חדש עם אותו קוד?`);
+        
+        if (recreateBoard) {
+            // Redirect to create new board
+            window.location.href = 'index.html';
+            return;
+        } else {
+            // Create a basic board structure for students to join
+            boardData = {
+                code: boardCode,
+                teacherName: 'מורה',
+                question: 'השאלה תוצג כאן לאחר שהמורה יעדכן את הלוח',
+                image: null,
+                settings: {
+                    allowAnonymous: true,
+                    moderateResponses: false
+                },
+                createdAt: new Date().toISOString(),
+                responses: []
+            };
+            
+            // Save the basic board
+            localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
+            
+            showToast('לוח נוצר במצב בסיסי. המורה יכול לעדכן את הפרטים.');
         }
-    }
-    
-    // If still no board data, show error
-    if (!boardData) {
-        console.log('Board not found, available boards:', Object.keys(localStorage).filter(key => key.startsWith('board_')));
-        alert(`לוח עם קוד ${boardCode} לא נמצא. ייתכן שהקוד שגוי או שהלוח נמחק.\n\nבדוק את הקישור או פנה למורה.`);
-        // Don't redirect anywhere - just show the error
-        return;
     }
     
     // Board exists, now set it as current
     currentBoard = boardData;
     console.log('Current board set:', currentBoard);
-    
-    // Save to localStorage for future use
-    localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
     
     // Update UI with board info
     document.getElementById('boardCode').textContent = currentBoard.code;
@@ -639,14 +653,9 @@ function addResponse(event) {
     // Add to responses
     responses.push(response);
     
-    // Save to localStorage and update URL
+    // Save to localStorage
     currentBoard.responses = responses;
     localStorage.setItem(`board_${currentBoard.code}`, JSON.stringify(currentBoard));
-    
-    // Update URL with new data
-    const encodedBoardData = encodeURIComponent(JSON.stringify(currentBoard));
-    const newUrl = `${window.location.origin}${window.location.pathname}?code=${currentBoard.code}&data=${encodedBoardData}`;
-    window.history.replaceState({}, '', newUrl);
     
     // Update display
     displayResponses();
