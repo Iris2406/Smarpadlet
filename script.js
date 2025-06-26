@@ -275,8 +275,8 @@ function showBoardCreated(boardData) {
         s: boardData.settings
     };
     
-    // Encode only essential data
-    const encodedData = btoa(JSON.stringify(compactBoardData));
+    // Encode data safely for Hebrew text
+    const encodedData = encodeURIComponent(JSON.stringify(compactBoardData));
     let boardLink = `${protocol}//${host}${basePath}board.html?d=${encodedData}`;
     
     console.log('Generated board link:', boardLink);
@@ -442,7 +442,7 @@ function initializeBoard() {
     // First try to get board data from URL
     if (encodedData) {
         try {
-            const compactData = JSON.parse(atob(encodedData));
+            const compactData = JSON.parse(decodeURIComponent(encodedData));
             boardData = {
                 code: compactData.c,
                 teacherName: compactData.t,
