@@ -254,7 +254,7 @@ function showBoardCreated(boardData) {
     document.getElementById('teacherForm').style.display = 'none';
     document.getElementById('boardCreated').style.display = 'block';
     
-    // Create correct board link
+    // Create correct board link with encoded board data
     const protocol = window.location.protocol; // http: or https:
     const host = window.location.host; // domain:port
     const pathname = window.location.pathname; // current path
@@ -266,9 +266,9 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}`;
-    
-
+    // Encode board data in the URL
+    const encodedBoardData = encodeURIComponent(JSON.stringify(boardData));
+    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}&data=${encodedBoardData}`;
     
     console.log('Generated board link:', boardLink);
     console.log('Protocol:', protocol);
@@ -277,7 +277,8 @@ function showBoardCreated(boardData) {
     
     document.getElementById('boardLink').textContent = boardLink;
     
-    // Also store the board data temporarily for goToBoard function
+    // Also store the board data locally AND in localStorage for backup
+    localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
     window.currentBoardData = boardData;
 }
 
@@ -426,8 +427,10 @@ function testWordCloud() {
 function initializeBoard() {
     const urlParams = new URLSearchParams(window.location.search);
     const boardCode = urlParams.get('code');
+    const encodedBoardData = urlParams.get('data');
     
     console.log('Initializing board with code:', boardCode);
+    console.log('Board data from URL:', encodedBoardData ? 'Found' : 'Not found');
     
     if (!boardCode) {
         alert('קישור לא תקין');
@@ -435,23 +438,48 @@ function initializeBoard() {
         return;
     }
     
-    // First, try to load the board
-    console.log('Searching for board in localStorage...');
-    const boardDataString = localStorage.getItem(`board_${boardCode}`);
-    console.log('Board data string found:', boardDataString);
+    let boardData = null;
     
-    if (!boardDataString) {
+    // First try to get board data from URL
+    if (encodedBoardData) {
+        try {
+            boardData = JSON.parse(decodeURIComponent(encodedBoardData));
+            console.log('Board data loaded from URL:', boardData);
+        } catch (e) {
+            console.error('Error parsing board data from URL:', e);
+        }
+    }
+    
+    // If no data in URL, try localStorage as fallback
+    if (!boardData) {
+        console.log('Searching for board in localStorage...');
+        const boardDataString = localStorage.getItem(`board_${boardCode}`);
+        console.log('Board data string found:', boardDataString);
+        
+        if (boardDataString) {
+            try {
+                boardData = JSON.parse(boardDataString);
+                console.log('Board data loaded from localStorage:', boardData);
+            } catch (e) {
+                console.error('Error parsing board data from localStorage:', e);
+            }
+        }
+    }
+    
+    // If still no board data, show error
+    if (!boardData) {
         console.log('Board not found, available boards:', Object.keys(localStorage).filter(key => key.startsWith('board_')));
         alert(`לוח עם קוד ${boardCode} לא נמצא. ייתכן שהקוד שגוי או שהלוח נמחק.\n\nבדוק את הקישור או פנה למורה.`);
         // Don't redirect anywhere - just show the error
         return;
     }
     
-    const boardData = JSON.parse(boardDataString);
-    
     // Board exists, now set it as current
     currentBoard = boardData;
     console.log('Current board set:', currentBoard);
+    
+    // Save to localStorage for future use
+    localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
     
     // Update UI with board info
     document.getElementById('boardCode').textContent = currentBoard.code;
@@ -472,13 +500,8 @@ function initializeBoard() {
         showStudentNameForm();
     }
     
+    // Load existing responses
     loadResponses();
-    
-    // Refresh responses every 5 seconds
-    setInterval(() => {
-        loadResponses();
-        updateStats();
-    }, 5000);
 }
 
 function checkTeacherAccess(boardCode) {
@@ -616,9 +639,14 @@ function addResponse(event) {
     // Add to responses
     responses.push(response);
     
-    // Save to localStorage
+    // Save to localStorage and update URL
     currentBoard.responses = responses;
     localStorage.setItem(`board_${currentBoard.code}`, JSON.stringify(currentBoard));
+    
+    // Update URL with new data
+    const encodedBoardData = encodeURIComponent(JSON.stringify(currentBoard));
+    const newUrl = `${window.location.origin}${window.location.pathname}?code=${currentBoard.code}&data=${encodedBoardData}`;
+    window.history.replaceState({}, '', newUrl);
     
     // Update display
     displayResponses();
@@ -898,8 +926,6 @@ function generateWordCloudHTML(wordCounts) {
     
     console.log('Word cloud generated successfully');
 }
-
-
 
 function downloadWordCloud() {
     const container = document.getElementById('wordCloudContainer');
