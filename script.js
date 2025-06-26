@@ -266,18 +266,17 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    // Create link with minimal essential data
-    const essentialData = {
-        code: boardData.code,
-        teacher: boardData.teacherName,
-        question: boardData.question,
-        image: boardData.image
+    // Create link with compact data that works reliably
+    const compactData = {
+        c: boardData.code,
+        t: boardData.teacherName,
+        q: boardData.question
     };
     
-    // Use a simple base64 encoding for the essential data
-    const dataString = JSON.stringify(essentialData);
-    const encodedData = btoa(unescape(encodeURIComponent(dataString)));
-    let boardLink = `${protocol}//${host}${basePath}board.html?data=${encodedData}`;
+    // Use URL hash instead of query parameters to avoid length limits
+    const dataString = JSON.stringify(compactData);
+    const encodedData = btoa(encodeURIComponent(dataString));
+    let boardLink = `${protocol}//${host}${basePath}board.html#${encodedData}`;
     
     console.log('Generated board link:', boardLink);
     
@@ -432,26 +431,23 @@ function testWordCloud() {
 
 // Board page functions
 function initializeBoard() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const encodedData = urlParams.get('data');
-    const boardCode = urlParams.get('code'); // fallback for old links
-    
     console.log('Initializing board...');
     
     let boardData = null;
     
-    // First try to get data from URL parameter
-    if (encodedData) {
+    // First try to get data from URL hash
+    const hash = window.location.hash.substring(1); // Remove the # character
+    if (hash) {
         try {
-            console.log('Decoding board data from URL...');
-            const dataString = decodeURIComponent(escape(atob(encodedData)));
-            const essentialData = JSON.parse(dataString);
+            console.log('Loading board data from URL hash...');
+            const dataString = decodeURIComponent(atob(hash));
+            const compactData = JSON.parse(dataString);
             
             boardData = {
-                code: essentialData.code,
-                teacherName: essentialData.teacher,
-                question: essentialData.question,
-                image: essentialData.image,
+                code: compactData.c,
+                teacherName: compactData.t,
+                question: compactData.q,
+                image: null, // Will be loaded from localStorage if exists
                 settings: {
                     allowAnonymous: true,
                     moderateResponses: false
@@ -460,22 +456,24 @@ function initializeBoard() {
                 responses: []
             };
             
-            console.log('Board data decoded successfully:', boardData);
+            console.log('Board data loaded from hash:', boardData);
             
-            // Save to localStorage for future updates
+            // Save to localStorage for response persistence
             localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
             
         } catch (e) {
-            console.error('Error decoding board data from URL:', e);
+            console.error('Error parsing board data from hash:', e);
         }
     }
     
-    // Fallback: try localStorage if URL decoding failed or old link format
-    if (!boardData && (boardCode || (encodedData && !boardData))) {
-        const codeToUse = boardCode || (boardData && boardData.code);
-        if (codeToUse) {
+    // Fallback: try localStorage if hash failed
+    if (!boardData) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const boardCode = urlParams.get('code');
+        
+        if (boardCode) {
             console.log('Trying localStorage fallback...');
-            const boardDataString = localStorage.getItem(`board_${codeToUse}`);
+            const boardDataString = localStorage.getItem(`board_${boardCode}`);
             if (boardDataString) {
                 try {
                     boardData = JSON.parse(boardDataString);
@@ -489,13 +487,13 @@ function initializeBoard() {
     
     // If still no board data, show error
     if (!boardData) {
-        alert('לא ניתן לטעון את נתוני הלוח. אנא פנה למורה לקישור מעודכן.');
+        alert('לא ניתן לטעון את נתוני הלוח. אנא בקש מהמורה קישור מעודכן.');
         return;
     }
     
     // Board loaded successfully
     currentBoard = boardData;
-    console.log('Board initialized:', currentBoard);
+    console.log('Board initialized successfully:', currentBoard);
     
     // Update UI with board info
     document.getElementById('boardCode').textContent = currentBoard.code;
