@@ -254,7 +254,7 @@ function showBoardCreated(boardData) {
     document.getElementById('teacherForm').style.display = 'none';
     document.getElementById('boardCreated').style.display = 'block';
     
-    // Create board link with essential data encoded in a compact way
+    // Create simple board link - back to basics
     const protocol = window.location.protocol;
     const host = window.location.host;
     const pathname = window.location.pathname;
@@ -266,25 +266,21 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    // Create a compact version of board data for URL
-    const compactBoardData = {
-        c: boardData.code,
-        t: boardData.teacherName,
-        q: boardData.question,
-        i: boardData.image,
-        s: boardData.settings
-    };
-    
-    // Encode data safely for Hebrew text
-    const encodedData = encodeURIComponent(JSON.stringify(compactBoardData));
-    let boardLink = `${protocol}//${host}${basePath}board.html?d=${encodedData}`;
+    // Simple link with just the board code
+    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}`;
     
     console.log('Generated board link:', boardLink);
     
     document.getElementById('boardLink').textContent = boardLink;
     
-    // Store board data in localStorage as backup
+    // Store board data in localStorage
     localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
+    
+    // Also store in a global shared object that can be accessed
+    if (!window.sharedBoards) {
+        window.sharedBoards = {};
+    }
+    window.sharedBoards[boardData.code] = boardData;
     
     window.currentBoardData = boardData;
 }
@@ -433,57 +429,65 @@ function testWordCloud() {
 // Board page functions
 function initializeBoard() {
     const urlParams = new URLSearchParams(window.location.search);
-    const encodedData = urlParams.get('d');
+    const boardCode = urlParams.get('code');
     
-    console.log('Initializing board...');
+    console.log('Initializing board with code:', boardCode);
+    
+    if (!boardCode) {
+        alert('קישור לא תקין - חסר קוד לוח');
+        return;
+    }
     
     let boardData = null;
     
-    // First try to get board data from URL
-    if (encodedData) {
+    // Try multiple sources for board data
+    console.log('Searching for board data...');
+    
+    // 1. Try localStorage first
+    const boardDataString = localStorage.getItem(`board_${boardCode}`);
+    if (boardDataString) {
         try {
-            const compactData = JSON.parse(decodeURIComponent(encodedData));
-            boardData = {
-                code: compactData.c,
-                teacherName: compactData.t,
-                question: compactData.q,
-                image: compactData.i,
-                settings: compactData.s,
-                createdAt: new Date().toISOString(),
-                responses: []
-            };
-            console.log('Board data loaded from URL:', boardData);
-            
-            // Save to localStorage for future use
-            localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
-            
+            boardData = JSON.parse(boardDataString);
+            console.log('Board data loaded from localStorage:', boardData);
         } catch (e) {
-            console.error('Error parsing board data from URL:', e);
+            console.error('Error parsing board data from localStorage:', e);
         }
     }
     
-    // If no data from URL, try localStorage as fallback
-    if (!boardData) {
-        // Try to get board code from old format
-        const boardCode = urlParams.get('code');
-        if (boardCode) {
-            console.log('Trying to load from localStorage with code:', boardCode);
-            const boardDataString = localStorage.getItem(`board_${boardCode}`);
-            if (boardDataString) {
-                try {
-                    boardData = JSON.parse(boardDataString);
-                    console.log('Board data loaded from localStorage:', boardData);
-                } catch (e) {
-                    console.error('Error parsing board data from localStorage:', e);
-                }
-            }
-        }
+    // 2. Try global shared boards
+    if (!boardData && window.sharedBoards && window.sharedBoards[boardCode]) {
+        boardData = window.sharedBoards[boardCode];
+        console.log('Board data loaded from shared boards:', boardData);
+        
+        // Save to localStorage for future use
+        localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
     }
     
-    // If still no board data, show error
+    // 3. If still no board data, create a basic one and show instructions
     if (!boardData) {
-        alert('לא ניתן לטעון את הלוח. נסה שוב או פנה למורה.');
-        return;
+        console.log('Board not found, creating basic structure');
+        
+        // Create a basic board structure
+        boardData = {
+            code: boardCode,
+            teacherName: 'מורה',
+            question: 'מחכה לעדכון מהמורה...',
+            image: null,
+            settings: {
+                allowAnonymous: true,
+                moderateResponses: false
+            },
+            createdAt: new Date().toISOString(),
+            responses: []
+        };
+        
+        // Save the basic board
+        localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
+        
+        // Show message to students
+        setTimeout(() => {
+            alert(`הלוח עם קוד ${boardCode} עדיין לא מוכן.\n\nזה יכול לקרות אם:\n- המורה עדיין לא סיים להגדיר את הלוח\n- הלוח נוצר במכשיר אחר\n\nנסה שוב בעוד כמה דקות או פנה למורה.`);
+        }, 1000);
     }
     
     // Board exists, now set it as current
