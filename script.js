@@ -254,10 +254,10 @@ function showBoardCreated(boardData) {
     document.getElementById('teacherForm').style.display = 'none';
     document.getElementById('boardCreated').style.display = 'block';
     
-    // Create simple board link - we'll handle data sharing differently
-    const protocol = window.location.protocol; // http: or https:
-    const host = window.location.host; // domain:port
-    const pathname = window.location.pathname; // current path
+    // Create board link with essential data encoded in a compact way
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const pathname = window.location.pathname;
     
     let basePath;
     if (pathname.includes('index.html')) {
@@ -266,24 +266,25 @@ function showBoardCreated(boardData) {
         basePath = pathname.endsWith('/') ? pathname : pathname + '/';
     }
     
-    let boardLink = `${protocol}//${host}${basePath}board.html?code=${boardData.code}`;
+    // Create a compact version of board data for URL
+    const compactBoardData = {
+        c: boardData.code,
+        t: boardData.teacherName,
+        q: boardData.question,
+        i: boardData.image,
+        s: boardData.settings
+    };
+    
+    // Encode only essential data
+    const encodedData = btoa(JSON.stringify(compactBoardData));
+    let boardLink = `${protocol}//${host}${basePath}board.html?d=${encodedData}`;
     
     console.log('Generated board link:', boardLink);
-    console.log('Protocol:', protocol);
-    console.log('Host:', host);
-    console.log('Full URL:', window.location.href);
     
     document.getElementById('boardLink').textContent = boardLink;
     
-    // Store board data in localStorage AND try to save to a shared location
+    // Store board data in localStorage as backup
     localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
-    
-    // Also try to save to sessionStorage which might be more accessible
-    try {
-        sessionStorage.setItem(`shared_board_${boardData.code}`, JSON.stringify(boardData));
-    } catch (e) {
-        console.log('Could not save to sessionStorage:', e);
-    }
     
     window.currentBoardData = boardData;
 }
@@ -432,63 +433,57 @@ function testWordCloud() {
 // Board page functions
 function initializeBoard() {
     const urlParams = new URLSearchParams(window.location.search);
-    const boardCode = urlParams.get('code');
+    const encodedData = urlParams.get('d');
     
-    console.log('Initializing board with code:', boardCode);
-    
-    if (!boardCode) {
-        alert('קישור לא תקין');
-        window.location.href = 'index.html';
-        return;
-    }
+    console.log('Initializing board...');
     
     let boardData = null;
     
-    // Try to load board data from localStorage
-    console.log('Searching for board in localStorage...');
-    const boardDataString = localStorage.getItem(`board_${boardCode}`);
-    console.log('Board data string found:', boardDataString);
-    
-    if (boardDataString) {
+    // First try to get board data from URL
+    if (encodedData) {
         try {
-            boardData = JSON.parse(boardDataString);
-            console.log('Board data loaded from localStorage:', boardData);
-        } catch (e) {
-            console.error('Error parsing board data from localStorage:', e);
-        }
-    }
-    
-    // If no board data found, create a minimal board and ask teacher to recreate
-    if (!boardData) {
-        console.log('Board not found, creating minimal board structure');
-        
-        // Show a message to the teacher to recreate the board
-        const recreateBoard = confirm(`לוח עם קוד ${boardCode} לא נמצא.\n\nזה יכול לקרות כי הלוח נוצר במכשיר אחר.\n\nהאם תרצה ליצור לוח חדש עם אותו קוד?`);
-        
-        if (recreateBoard) {
-            // Redirect to create new board
-            window.location.href = 'index.html';
-            return;
-        } else {
-            // Create a basic board structure for students to join
+            const compactData = JSON.parse(atob(encodedData));
             boardData = {
-                code: boardCode,
-                teacherName: 'מורה',
-                question: 'השאלה תוצג כאן לאחר שהמורה יעדכן את הלוח',
-                image: null,
-                settings: {
-                    allowAnonymous: true,
-                    moderateResponses: false
-                },
+                code: compactData.c,
+                teacherName: compactData.t,
+                question: compactData.q,
+                image: compactData.i,
+                settings: compactData.s,
                 createdAt: new Date().toISOString(),
                 responses: []
             };
+            console.log('Board data loaded from URL:', boardData);
             
-            // Save the basic board
-            localStorage.setItem(`board_${boardCode}`, JSON.stringify(boardData));
+            // Save to localStorage for future use
+            localStorage.setItem(`board_${boardData.code}`, JSON.stringify(boardData));
             
-            showToast('לוח נוצר במצב בסיסי. המורה יכול לעדכן את הפרטים.');
+        } catch (e) {
+            console.error('Error parsing board data from URL:', e);
         }
+    }
+    
+    // If no data from URL, try localStorage as fallback
+    if (!boardData) {
+        // Try to get board code from old format
+        const boardCode = urlParams.get('code');
+        if (boardCode) {
+            console.log('Trying to load from localStorage with code:', boardCode);
+            const boardDataString = localStorage.getItem(`board_${boardCode}`);
+            if (boardDataString) {
+                try {
+                    boardData = JSON.parse(boardDataString);
+                    console.log('Board data loaded from localStorage:', boardData);
+                } catch (e) {
+                    console.error('Error parsing board data from localStorage:', e);
+                }
+            }
+        }
+    }
+    
+    // If still no board data, show error
+    if (!boardData) {
+        alert('לא ניתן לטעון את הלוח. נסה שוב או פנה למורה.');
+        return;
     }
     
     // Board exists, now set it as current
@@ -506,7 +501,7 @@ function initializeBoard() {
     }
     
     // Check if this is the teacher accessing their own board
-    checkTeacherAccess(boardCode);
+    checkTeacherAccess(currentBoard.code);
     
     // If not teacher, show student name form
     if (!currentUser || !currentUser.isTeacher) {
