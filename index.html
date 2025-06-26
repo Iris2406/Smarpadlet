@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#d5a400">
+    <title>SmartPadlet - צור לוח חדש</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="hero">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1><i class="fas fa-chalkboard-teacher"></i> SmartPadlet</h1>
+                    <p>צור לוח אינטראקטיבי פשוט ומהיר</p>
+                    <img src="logo.svg" alt="לוגו" class="logo">
+                </div>
+            </div>
+        </header>
+
+        <main class="teacher-main">
+            <div class="form-container">
+                <form id="teacherForm" onsubmit="createBoard(event)">
+                    <div class="form-group">
+                        <label for="teacherName">השם שלך:</label>
+                        <input type="text" id="teacherName" required placeholder="הזן את שמך">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="question">השאלה לתלמידים:</label>
+                        <textarea id="question" required placeholder="כתוב את השאלה או הנושא לדיון..." rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>הוסף תמונה (אופציונלי):</label>
+                        <div class="image-upload-options">
+                            <div class="upload-option">
+                                <label for="imageFile" class="upload-btn">
+                                    <i class="fas fa-upload"></i> העלה תמונה
+                                </label>
+                                <input type="file" id="imageFile" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                            </div>
+                            <div class="upload-option">
+                                <input type="url" id="imageUrl" placeholder="או הזן קישור לתמונה" onchange="handleImageUrl(event)">
+                            </div>
+                        </div>
+                        <div id="imagePreview" class="image-preview"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>הגדרות לוח:</label>
+                        <div class="settings-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="allowAnonymous" checked>
+                                אפשר תגובות אנונימיות
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="moderateResponses">
+                                אשר תגובות לפני הצגה
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-plus-circle"></i> צור לוח חדש
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="debugStorage()" style="margin-top: 10px;">
+                            <i class="fas fa-bug"></i> בדיקת אחסון (DEBUG)
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="clearStorage()" style="margin-top: 10px; margin-right: 10px;">
+                            <i class="fas fa-trash"></i> נקה אחסון
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="testWordCloud()" style="margin-top: 10px; margin-right: 10px;">
+                            <i class="fas fa-cloud"></i> בדיקת ענן מילים
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="boardCreated" class="board-created" style="display: none;">
+                <div class="success-message">
+                    <i class="fas fa-check-circle"></i>
+                    <h2>הלוח נוצר בהצלחה!</h2>
+                    <div class="access-info">
+                        <div class="board-link">
+                            <label>קישור ללוח לתלמידים:</label>
+                            <div class="link-display">
+                                <span id="boardLink"></span>
+                                <button class="copy-btn" onclick="copyLink()">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <p class="link-instruction">לחץ על כפתור ההעתקה והדבק את הקישור בוואטסאפ של הכיתה</p>
+                        </div>
+                    </div>
+                    <div class="next-actions">
+                        <button class="btn-primary" onclick="goToBoard()">
+                            <i class="fas fa-eye"></i> צפה בלוח
+                        </button>
+                        <button class="btn-secondary" onclick="createAnother()">
+                            <i class="fas fa-plus"></i> צור לוח נוסף
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>אפליקציה פשוטה לשיתוף ברעיונות בכיתה • ללא צורך בהרשמה או שמירת נתונים</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

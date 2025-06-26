@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#d5a400">
+    <title>לוח אינטראקטיבי - SmartPadlet</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="board-header">
+            <div class="header-top">
+                <a href="index.html" class="back-btn"><i class="fas fa-home"></i> עמוד הבית</a>
+                <div class="board-info">
+                    <span class="board-code">קוד: <strong id="boardCode"></strong></span>
+                    <span class="teacher-name">מורה: <strong id="teacherName"></strong></span>
+                </div>
+                <div class="board-controls">
+                    <button id="teacherControlsBtn" class="btn-secondary" onclick="toggleTeacherControls()" style="display: none;">
+                        <i class="fas fa-cog"></i> פקדי מורה
+                    </button>
+                </div>
+            </div>
+            
+            <div class="question-section">
+                <h2 id="questionText"></h2>
+                <div id="questionImage" class="question-image"></div>
+            </div>
+        </header>
+
+        <!-- Teacher Controls Panel -->
+        <div id="teacherPanel" class="teacher-panel" style="display: none;">
+            <div class="panel-content">
+                <div class="stats-section">
+                    <h3><i class="fas fa-chart-bar"></i> סטטיסטיקות</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalResponses">0</div>
+                            <div class="stat-label">תגובות</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="uniqueStudents">0</div>
+                            <div class="stat-label">תלמידים</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalWords">0</div>
+                            <div class="stat-label">מילים</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="actions-section">
+                    <button class="btn-primary" onclick="exportToCSV()">
+                        <i class="fas fa-download"></i> ייצא לCSV
+                    </button>
+                    <button class="btn-secondary" onclick="clearBoard()">
+                        <i class="fas fa-trash"></i> נקה לוח
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Add Response -->
+        <div class="student-actions">
+            <button id="addResponseBtn" class="btn-primary large" onclick="showResponseForm()">
+                <i class="fas fa-plus"></i> הוסף תגובה
+            </button>
+        </div>
+
+        <!-- Response Form Modal -->
+        <div id="responseModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>הוסף תגובה חדשה</h3>
+                    <button class="close-btn" onclick="hideResponseForm()">&times;</button>
+                </div>
+                <form id="responseForm" onsubmit="addResponse(event)">
+                    <div class="form-group">
+                        <label for="responseText">התגובה שלך:</label>
+                        <textarea id="responseText" required placeholder="כתוב את התגובה שלך כאן..." rows="4"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>בחר צבע רקע:</label>
+                        <div class="color-picker">
+                            <input type="radio" name="bgColor" value="#f9dde3" id="color1" checked>
+                            <label for="color1" class="color-option" style="background-color: #f9dde3;"></label>
+                            
+                            <input type="radio" name="bgColor" value="#ffc0c5" id="color2">
+                            <label for="color2" class="color-option" style="background-color: #ffc0c5;"></label>
+                            
+                            <input type="radio" name="bgColor" value="#fff2b3" id="color3">
+                            <label for="color3" class="color-option" style="background-color: #fff2b3;"></label>
+                            
+                            <input type="radio" name="bgColor" value="#b3f5f0" id="color4">
+                            <label for="color4" class="color-option" style="background-color: #b3f5f0;"></label>
+                            
+                            <input type="radio" name="bgColor" value="#e6f3ff" id="color5">
+                            <label for="color5" class="color-option" style="background-color: #e6f3ff;"></label>
+                            
+                            <input type="radio" name="bgColor" value="#f0f0f0" id="color6">
+                            <label for="color6" class="color-option" style="background-color: #f0f0f0;"></label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>בחר אימוג'י:</label>
+                        <div class="emoji-picker">
+                            <input type="radio" name="emoji" value="😊" id="emoji1" checked>
+                            <label for="emoji1" class="emoji-option">😊</label>
+                            
+                            <input type="radio" name="emoji" value="🤔" id="emoji2">
+                            <label for="emoji2" class="emoji-option">🤔</label>
+                            
+                            <input type="radio" name="emoji" value="💡" id="emoji3">
+                            <label for="emoji3" class="emoji-option">💡</label>
+                            
+                            <input type="radio" name="emoji" value="❤️" id="emoji4">
+                            <label for="emoji4" class="emoji-option">❤️</label>
+                            
+                            <input type="radio" name="emoji" value="👍" id="emoji5">
+                            <label for="emoji5" class="emoji-option">👍</label>
+                            
+                            <input type="radio" name="emoji" value="🔥" id="emoji6">
+                            <label for="emoji6" class="emoji-option">🔥</label>
+                            
+                            <input type="radio" name="emoji" value="✨" id="emoji7">
+                            <label for="emoji7" class="emoji-option">✨</label>
+                            
+                            <input type="radio" name="emoji" value="🎯" id="emoji8">
+                            <label for="emoji8" class="emoji-option">🎯</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">הוסף תגובה</button>
+                        <button type="button" class="btn-secondary" onclick="hideResponseForm()">ביטול</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="view-controls">
+            <div class="view-toggle">
+                <button id="gridViewBtn" class="view-btn active" onclick="switchView('grid')">
+                    <i class="fas fa-th"></i> תצוגת כרטיסים
+                </button>
+                <button id="cloudViewBtn" class="view-btn" onclick="switchView('cloud')">
+                    <i class="fas fa-cloud"></i> ענן מילים
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="board-main">
+            <!-- Grid View -->
+            <div id="gridView" class="responses-grid">
+                <div id="responsesContainer" class="responses-container">
+                    <!-- Responses will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Word Cloud View -->
+            <div id="cloudView" class="word-cloud-view" style="display: none;">
+                <div class="cloud-controls">
+                    <button class="btn-secondary" onclick="downloadWordCloud()">
+                        <i class="fas fa-download"></i> הורד כתמונה
+                    </button>
+                    <button class="btn-secondary" onclick="debugWordCloud()" style="margin-right: 10px;">
+                        <i class="fas fa-bug"></i> Debug ענן מילים
+                    </button>
+                </div>
+                <div id="wordCloudContainer" class="word-cloud-container">
+                    <!-- Word cloud will be generated here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state">
+            <i class="fas fa-comments"></i>
+            <h3>אין תגובות עדיין</h3>
+            <p>התלמידים עדיין לא הוסיפו תגובות. שתף את קוד הגישה איתם!</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="wordcloud.js"></script>
+</body>
+</html> 
